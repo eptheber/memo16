@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Memoria (4x4) - Lean Canvas</title>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --card-back: #1e293b;
+            --text: #0f172a;
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #16a34a;
+            --title-badge: #e0e7ff;
+            --title-text: #3730a3;
+            --def-badge: #fef3c7;
+            --def-text: #92400e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+
+        p.subtitle {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        /* Barra de Controles y Estadísticas */
+        .controls-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            background: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .stat-item span {
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        .btn-start {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-start:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-start:active {
+            transform: scale(0.98);
+        }
+
+        /* Tablero 4x4 (4 filas por 4 columnas = 16 fichas) */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 850px;
+            perspective: 1000px;
+        }
+
+        @media (max-width: 600px) {
+            .game-grid {
+                gap: 8px;
+            }
+        }
+
+        .card {
+            background-color: transparent;
+            height: 120px;
+            cursor: pointer;
+            perspective: 1000px;
+            opacity: 0.65;
+            pointer-events: none; /* Inactivas hasta hacer clic en Iniciar */
+            transition: opacity 0.3s;
+        }
+
+        .card.active-board {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.4s;
+            transform-style: preserve-3d;
+            border-radius: 8px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        .card.flipped .card-inner, 
+        .card.matched .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            overflow: hidden;
+        }
+
+        .card-back {
+            background: var(--card-back);
+            color: white;
+            justify-content: center;
+            border: 2px solid #334155;
+        }
+
+        .card-back::after {
+            content: "💡";
+            font-size: 1.8rem;
+        }
+
+        .card-front {
+            background-color: var(--card-bg);
+            transform: rotateY(180deg);
+            border: 2px solid #cbd5e1;
+        }
+
+        .card.matched .card-front {
+            border-color: var(--success);
+            background-color: #f0fdf4;
+        }
+
+        .badge {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+
+        .badge-title { background-color: var(--title-badge); color: var(--title-text); }
+        .badge-def { background-color: var(--def-badge); color: var(--def-text); }
+
+        .card-text {
+            font-size: 0.78rem;
+            line-height: 1.2;
+            color: #334155;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .card-text.title-text {
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: #0f172a;
+        }
+
+        /* Modal Victoria */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 100;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content h2 { font-size: 1.8rem; color: var(--success); margin-bottom: 8px; }
+        .modal-time { font-size: 1.3rem; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+        .modal-content p { margin-bottom: 20px; color: #475569; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Memoria Lean Canvas (4x4)</h1>
+        <p class="subtitle">Empareja los 8 títulos con sus definiciones en el menor tiempo posible</p>
+    </header>
+
+    <div class="controls-bar">
+        <button class="btn-start" id="startBtn" onclick="handleStartButton()">🚀 Iniciar Juego</button>
+        <div class="stat-item">⏱️ Tiempo: <span id="timer">00:00</span></div>
+        <div class="stat-item">🧩 Parejas: <span id="matches">0</span> / 8</div>
+    </div>
+
+    <!-- Tablero 4x4 (16 Fichas) -->
+    <div class="game-grid" id="gameGrid"></div>
+
+    <!-- Modal de Victoria -->
+    <div class="modal-overlay" id="victoryModal">
+        <div class="modal-content">
+            <h2>🎉 ¡Felicitaciones! 🎉</h2>
+            <div class="modal-time" id="finalTimeText">00:00</div>
+            <p>Has completado el tablero de 16 partes del Lean Canvas con éxito.</p>
+            <button class="btn-start" onclick="resetGame(); startGame();">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        // Banco completo de partes de Lean Canvas
+        const fullLeanCanvasParts = [
+            { id: 1, title: "Problema", def: "Los 1 a 3 problemas principales de tus clientes." },
+            { id: 2, title: "Alternativas Existentes", def: "Cómo resuelven actualmente estos problemas." },
+            { id: 3, title: "Segmento de Clientes", def: "El grupo objetivo específico al que te diriges." },
+            { id: 4, title: "Adoptantes Tempranos", def: "Los primeros clientes dispuestos a probar y pagar." },
+            { id: 5, title: "Propuesta de Valor Única", def: "Mensaje claro que explica por qué eres diferente." },
+            { id: 6, title: "Concepto de Alto Nivel", def: "Tu idea explicada con una analogía sencilla." },
+            { id: 7, title: "Solución", def: "Características clave que resuelven los problemas." },
+            { id: 8, title: "Canales", def: "Medios para comunicarte y vender a tus clientes." },
+            { id: 9, title: "Flujo de Ingresos", def: "Fuentes y modelos de donde provendrá el dinero." },
+            { id: 10, title: "Estructura de Costos", def: "Gastos fijos y variables para operar la idea." },
+            { id: 11, title: "Métricas Clave", def: "Indicadores clave para medir el avance y éxito." },
+            { id: 12, title: "Ventaja Incompetible", def: "Factor único difícil de copiar o comprar." }
+        ];
+
+        let cards = [];
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = false;
+        let matches = 0;
+
+        // Cronómetro
+        let timerInterval = null;
+        let secondsElapsed = 0;
+        let gameRunning = false;
+
+        // Web Audio API para Efectos de Sonido
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Sonido de Acierto (Tono alegre / Chime)
+        function playCorrectSound() {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+                
+                // Nota 1 (E5)
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(659.25, now);
+                gain1.gain.setValueAtTime(0.15, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.2);
+
+                // Nota 2 (A5)
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880, now + 0.1);
+                gain2.gain.setValueAtTime(0.2, now + 0.1);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.1);
+                osc2.stop(now + 0.4);
+            } catch (e) {
+                console.log("Error al reproducir audio:", e);
+            }
+        }
+
+        // Sonido de Error (Zumbido grave)
+        function playErrorSound() {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+                
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(160, now);
+                osc.frequency.setValueAtTime(110, now + 0.15);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } catch (e) {
+                console.log("Error al reproducir audio:", e);
+            }
+        }
+
+        function shuffle(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function createDeck() {
+            // Seleccionar 8 conceptos aleatorios de la lista
+            const selectedParts = shuffle(fullLeanCanvasParts).slice(0, 8);
+            let deck = [];
+
+            selectedParts.forEach(item => {
+                deck.push({ pairId: item.id, type: 'title', text: item.title });
+                deck.push({ pairId: item.id, type: 'def', text: item.def });
+            });
+
+            return shuffle(deck); // 16 fichas (4x4)
+        }
+
+        function renderBoard() {
+            const grid = document.getElementById('gameGrid');
+            grid.innerHTML = '';
+            cards = createDeck();
+
+            cards.forEach((cardData, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.pairId = cardData.pairId;
+                card.dataset.index = index;
+
+                const isTitle = cardData.type === 'title';
+
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-back"></div>
+                        <div class="card-front">
+                            <span class="badge ${isTitle ? 'badge-title' : 'badge-def'}">
+                                ${isTitle ? '📌 Título' : '💡 Definición'}
+                            </span>
+                            <div class="card-text ${isTitle ? 'title-text' : ''}">
+                                ${cardData.text}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', flipCard);
+                grid.appendChild(card);
+            });
+        }
+
+        /* Lógica del Cronómetro */
+        function startTimer() {
+            stopTimer();
+            secondsElapsed = 0;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        function updateTimerDisplay() {
+            const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+            const secs = String(secondsElapsed % 60).padStart(2, '0');
+            document.getElementById('timer').innerText = `${mins}:${secs}`;
+        }
+
+        function handleStartButton() {
+            getAudioContext(); // Inicializar audio al interactuar
+            if (!gameRunning) {
+                startGame();
+            } else {
+                resetGame();
+            }
+        }
+
+        function startGame() {
+            gameRunning = true;
+            document.getElementById('startBtn').innerText = '🔄 Reiniciar Juego';
+            
+            // Activar fichas
+            const allCards = document.querySelectorAll('.card');
+            allCards.forEach(card => card.classList.add('active-board'));
+
+            startTimer();
+        }
+
+        function flipCard() {
+            if (!gameRunning || lockBoard) return;
+            if (this === firstCard) return;
+            if (this.classList.contains('matched')) return;
+
+            this.classList.add('flipped');
+
+            if (!firstCard) {
+                firstCard = this;
+                return;
+            }
+
+            secondCard = this;
+            checkMatch();
+        }
+
+        function checkMatch() {
+            const isMatch = firstCard.dataset.pairId === secondCard.dataset.pairId;
+
+            if (isMatch) {
+                playCorrectSound(); // 🔔 Sonido de acierto
+                matches++;
+                document.getElementById('matches').innerText = matches;
+                disableCards();
+
+                if (matches === 8) { // 8 parejas en total (16 fichas)
+                    stopTimer();
+                    setTimeout(showVictoryModal, 500);
+                }
+            } else {
+                playErrorSound(); // ✖️ Sonido de error
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            firstCard.classList.add('matched');
+            secondCard.classList.add('matched');
+            resetTurn();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                resetTurn();
+            }, 1000);
+        }
+
+        function resetTurn() {
+            [firstCard, secondCard] = [null, null];
+            lockBoard = false;
+        }
+
+        function showVictoryModal() {
+            const modal = document.getElementById('victoryModal');
+            const finalTimeText = document.getElementById('finalTimeText');
+            const formattedTime = document.getElementById('timer').innerText;
+
+            finalTimeText.innerText = `Tiempo total: ${formattedTime}`;
+            modal.classList.add('active');
+        }
+
+        function resetGame() {
+            stopTimer();
+            gameRunning = false;
+            matches = 0;
+            document.getElementById('matches').innerText = '0';
+            document.getElementById('timer').innerText = '00:00';
+            document.getElementById('startBtn').innerText = '🚀 Iniciar Juego';
+            document.getElementById('victoryModal').classList.remove('active');
+
+            resetTurn();
+            renderBoard();
+        }
+
+        window.onload = resetGame;
+    </script>
+</body>
+</html>
